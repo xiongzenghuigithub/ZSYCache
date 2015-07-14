@@ -17,6 +17,9 @@
 static NSString *const ZSYCACHE_DEFAULT_HOLDER_NAME = @"ZsyCaheDefaultHolder";
 static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFolder";
 
+static NSInteger const ZSYCACHE_DEFAULT_ARCHIVER_TIME   = 10.f;
+static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
+
 /**
  *  内存保存、本地保存
  *
@@ -101,7 +104,6 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     NSParameterAssert(object);
     NSParameterAssert(key);
     
-    [_normalLock lock];
     ZSYCacheObject *cacheObject = [[ZSYCacheObject alloc] initWithData:object Duration:duration];
     
     if (_isArchiving) {
@@ -115,6 +117,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     
     //按照过期时间从小--》到大，重新排序keys数组
     //数组下标0++， 过期时间越来越晚
+    [_normalLock lock];
     [self.keys removeObject:key];
     for (NSInteger i = (_keys.count - 1);i >= 0; i--) {
         NSString *lastKey = [_keys objectAtIndex:i];
@@ -134,12 +137,12 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
         [self.keys addObject:key];
     }
     
+    [_normalLock unlock];
+    
     //如果内存保存的数据超过规定大小，持久化到本地
     if ([self isShouldLoadToMemory]){
         [self doArchiverData];//注： 多线程调用方法
     }
-    
-    [_normalLock unlock];
 }
 
 - (ZSYCacheObject *)zsyGetObjectForKey:(NSString *)key {
@@ -228,12 +231,20 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 }
 
 - (void)scheduleArchive {
-    [self performSelector:@selector(startArchiverData) onThread:[self archiveringThread] withObject:nil waitUntilDone:NO modes:[self.runLoopModes allObjects]];
+    [self performSelector:@selector(startArchiverData)
+                 onThread:[self archiveringThread]
+               withObject:nil
+            waitUntilDone:NO
+                    modes:[self.runLoopModes allObjects]];
 }
 
 - (void)startArchiverData {
     NSRunLoop *runloop = [NSRunLoop currentRunLoop];
-    _archiveringTimer = [NSTimer timerWithTimeInterval:10.f target:self selector:@selector(doArchiverData) userInfo:nil repeats:YES];
+    _archiveringTimer = [NSTimer timerWithTimeInterval:ZSYCACHE_DEFAULT_ARCHIVER_TIME
+                                                target:self
+                                              selector:@selector(doArchiverData)
+                                              userInfo:nil
+                                               repeats:YES];
     [runloop addTimer:_archiveringTimer forMode:NSDefaultRunLoopMode];
     while (YES) {
         [runloop runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:2.f]];
@@ -242,6 +253,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 
 #pragma mark 归档
 - (void)doArchiverData {
+    [_normalLock lock];
     NSLog(@"...doArchiverData...\n");
     _isArchiving = YES;
     if (ZSYCACHE_ARCHIVING_THRESHOLD > 0 && \
@@ -269,6 +281,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
         _keys = copyKeys;
     }
     _isArchiving = NO;
+    [_normalLock unlock];
 }
 
 - (void)doArchiverDatas {
@@ -285,7 +298,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 
 - (void)startCleanData {
     NSRunLoop *runloop = [NSRunLoop currentRunLoop];
-    _cleaningTimer = [NSTimer timerWithTimeInterval:10.f
+    _cleaningTimer = [NSTimer timerWithTimeInterval:ZSYCACHE_DEFAULT_CLEANING_TIME
                                              target:self
                                            selector:@selector(doCleanData)
                                            userInfo:nil
