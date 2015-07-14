@@ -11,8 +11,8 @@
 #import "ZSYCacheHeader.h"
 #import "NSDictionary+ObjectiveSugar.h"
 
-static NSInteger LOCK_CONDITION_FREE                 = 1;
-static NSInteger LOCK_CONDITION_OPERATING            = 2;
+//static NSInteger LOCK_CONDITION_FREE                 = 1;
+//static NSInteger LOCK_CONDITION_OPERATING            = 2;
 
 static NSString *const ZSYCACHE_DEFAULT_HOLDER_NAME = @"ZsyCaheDefaultHolder";
 static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFolder";
@@ -79,7 +79,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
         _objects = [NSMutableDictionary dictionary];
         _keys = [NSMutableArray array];
         _isArchiving = NO;
-        _conditionLock = [[NSConditionLock alloc] initWithCondition:LOCK_CONDITION_FREE];
+//        _conditionLock = [[NSConditionLock alloc] initWithCondition:LOCK_CONDITION_FREE];
         _normalLock = [[NSRecursiveLock alloc] init];
         _path = [ZSYCacheTool appendPathAfterDucument:identifier];
         _runLoopModes = [NSSet setWithObject:NSRunLoopCommonModes];
@@ -223,10 +223,10 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
         __strong __typeof(weakSelf)strongSelf = weakSelf;
         [strongSelf scheduleArchive];
     });
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-        __strong __typeof(weakSelf)strongSelf = weakSelf;
-        [strongSelf scheduleClean];
-    });
+//    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+//        __strong __typeof(weakSelf)strongSelf = weakSelf;
+//        [strongSelf scheduleClean];
+//    });
 }
 
 - (void)scheduleArchive {
@@ -243,15 +243,13 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 }
 
 - (void)doArchiverData {
+    [_normalLock lock];
     NSLog(@"...doArchiverData...\n");
     _isArchiving = YES;
     if (ZSYCACHE_ARCHIVING_THRESHOLD > 0 && \
         self.size > ZSYCACHE_ARCHIVING_THRESHOLD)
     {
         [ZSYCacheTool checkFolderAtPath:_path];
-//        [_conditionLock lockWhenCondition:LOCK_CONDITION_FREE];
-        [_normalLock lock];
-        
         NSMutableArray *copyKeys = [self.keys mutableCopy];//使用深拷贝一个新的
         while([copyKeys count] > 0) {
             
@@ -271,10 +269,9 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
             [copyKeys removeLastObject];
         }
         _keys = copyKeys;
-//        [_conditionLock unlockWithCondition:LOCK_CONDITION_FREE];
-        [_normalLock unlock];
     }
     _isArchiving = NO;
+    [_normalLock unlock];
 }
 
 - (void)doArchiverDatas {

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>DDFEF4A7-EB5F-4105-9128-FD59949935D0</string>
+	<key>IDESourceControlProjectName</key>
+	<string>ZSYCache</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>06FA9A4485B94075E9B541D90735A60C1D67E052</key>
+		<string>https://github.com/xiongzenghuigithub/ZSYCache.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>ZSYCache.xcodeproj</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>06FA9A4485B94075E9B541D90735A60C1D67E052</key>
+		<string>../..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/xiongzenghuigithub/ZSYCache.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>06FA9A4485B94075E9B541D90735A60C1D67E052</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>06FA9A4485B94075E9B541D90735A60C1D67E052</string>
+			<key>IDESourceControlWCCName</key>
+			<string>ZSYCache</string>
+		</dict>
+	</array>
+</dict>
+</plist>
