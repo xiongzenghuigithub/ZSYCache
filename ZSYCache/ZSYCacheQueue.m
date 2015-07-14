@@ -80,21 +80,21 @@
 #pragma mark - private
 
 - (void)_cleanExpirateObjects {
-//    if (_keysQueue.count < 1) {
-//        return;
-//    }
-//    
-//    for (int i = 0; i < (_keysQueue.count - 1); i++) {//count-1，是因为最后加入的时刚入队的，肯定不会超时
-//        NSString *cachedObjectKey = [_keysQueue objectAtIndex:i];
-//        ZSYCacheObject *cachedObject = [_holder zsyGetObjectForKey:cachedObjectKey];
-//        if ([cachedObject isCacheObjectExpirate]) {
-//            if (_onExpirate) {
-//                _onExpirate([cachedObject cacheObjectValue]);
-//            }
-//            [_keysQueue removeObject:cachedObjectKey];
-//            [_holder zsyRemoveObjectForKey:cachedObjectKey];
-//        }
-//    }
+    if (_keysQueue.count < 1) {
+        return;
+    }
+    
+    for (int i = 0; i < (_keysQueue.count - 1); i++) {//count-1，是因为最后加入的时刚入队的，肯定不会超时
+        NSString *cachedObjectKey = [_keysQueue objectAtIndex:i];
+        ZSYCacheObject *cachedObject = [_holder zsyGetObjectForKey:cachedObjectKey];
+        if ([cachedObject isCacheObjectExpirate]) {
+            if (_onExpirate) {
+                _onExpirate([cachedObject cacheObjectValue]);
+            }
+            [_keysQueue removeObject:cachedObjectKey];
+            [_holder zsyRemoveObjectForKey:cachedObjectKey];
+        }
+    }
 }
 
 - (void)_clearCompeltionBlocks {

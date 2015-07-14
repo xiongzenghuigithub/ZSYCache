@@ -44,12 +44,12 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 
 - (void)scheduleArchive;
 - (void)startArchiverData;
-- (void)doArchiverData;
+- (void)doArchiverData;//必须多线程互斥访问
 - (void)doArchiverDatas;
 
 - (void)scheduleClean;
 - (void)startCleanData;
-- (void)doCleanData;
+- (void)doCleanData;//必须多线程互斥访问
 - (void)doCleanDatas;
 - (void)cleanExpirateObjects;
 
@@ -223,10 +223,10 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
         __strong __typeof(weakSelf)strongSelf = weakSelf;
         [strongSelf scheduleArchive];
     });
-//    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-//        __strong __typeof(weakSelf)strongSelf = weakSelf;
-//        [strongSelf scheduleClean];
-//    });
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+        __strong __typeof(weakSelf)strongSelf = weakSelf;
+        [strongSelf scheduleClean];
+    });
 }
 
 - (void)scheduleArchive {
@@ -242,6 +242,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     }
 }
 
+#pragma mark 归档
 - (void)doArchiverData {
     [_normalLock lock];
     NSLog(@"...doArchiverData...\n");
@@ -291,6 +292,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     }
 }
 
+#pragma mark 清除数据
 - (void)doCleanData {
     NSLog(@"... doCleanData ... \n");
 }
@@ -306,12 +308,11 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 #pragma mark Find CachedObejct
 //内存或本地读取
 - (ZSYCacheObject *)cachedObjectForKey:(NSString *)key {
+    [_normalLock lock];
     if (![_keys containsObject:key]) {//1. 内存不存在key，读取文件data
         
         NSString *path = [self.path stringByAppendingPathComponent:key];
         if ([ZSYCacheTool checkFileAtPath:path]) {
-//            [_conditionLock lockWhenCondition:LOCK_CONDITION_FREE];
-            [_normalLock lock];
             NSData *data = [[NSData alloc] initWithContentsOfFile:path];
             if (![self isShouldLoadToMemory]) {
                 //读入内存
@@ -319,16 +320,17 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
                 [self.objects setValue:data forKey:key];
                 //移除本地文件
                 [ZSYCacheTool removeFileAtPath:path];
-//                [_conditionLock unlockWithCondition:LOCK_CONDITION_FREE];
                 [_normalLock unlock];
                 return [[ZSYCacheObject alloc] initWithData:data];
             } else {
+                [_normalLock unlock];
                 return [[ZSYCacheObject alloc] initWithData:data];
             }
         } else {
             return nil;
         }
     } else {//2. 内存存在key，直接读取内存data
+        [_normalLock unlock];
         return [[ZSYCacheObject alloc] initWithData:self.objects[key]];
     }
 }
