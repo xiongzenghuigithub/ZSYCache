@@ -101,6 +101,7 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     NSParameterAssert(object);
     NSParameterAssert(key);
     
+    [_normalLock lock];
     ZSYCacheObject *cacheObject = [[ZSYCacheObject alloc] initWithData:object Duration:duration];
     
     if (_isArchiving) {
@@ -115,9 +116,6 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     //按照过期时间从小--》到大，重新排序keys数组
     //数组下标0++， 过期时间越来越晚
     [self.keys removeObject:key];
-    
-//    [_conditionLock lockWhenCondition:LOCK_CONDITION_FREE];
-    [_normalLock lock];
     for (NSInteger i = (_keys.count - 1);i >= 0; i--) {
         NSString *lastKey = [_keys objectAtIndex:i];
         ZSYCacheObject *tmp = [self zsyGetObjectForKey:lastKey];
@@ -130,8 +128,6 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
             break;
         }
     }
-//    [_conditionLock unlockWithCondition:LOCK_CONDITION_FREE];
-    [_normalLock unlock];
     
     //说明当前object的过期时间最早，直接插入到数组0个位置
     if (![self.keys containsObject:key]) {
@@ -140,8 +136,10 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
     
     //如果内存保存的数据超过规定大小，持久化到本地
     if ([self isShouldLoadToMemory]){
-        [self doArchiverData];
+        [self doArchiverData];//注： 多线程调用方法
     }
+    
+    [_normalLock unlock];
 }
 
 - (ZSYCacheObject *)zsyGetObjectForKey:(NSString *)key {
@@ -244,7 +242,6 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 
 #pragma mark 归档
 - (void)doArchiverData {
-    [_normalLock lock];
     NSLog(@"...doArchiverData...\n");
     _isArchiving = YES;
     if (ZSYCACHE_ARCHIVING_THRESHOLD > 0 && \
@@ -272,7 +269,6 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
         _keys = copyKeys;
     }
     _isArchiving = NO;
-    [_normalLock unlock];
 }
 
 - (void)doArchiverDatas {
@@ -280,12 +276,20 @@ static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFo
 }
 
 - (void)scheduleClean {
-    [self performSelector:@selector(startCleanData) onThread:[self cleaningThread] withObject:nil waitUntilDone:NO modes:[self.runLoopModes allObjects]];
+    [self performSelector:@selector(startCleanData)
+                 onThread:[self cleaningThread]
+               withObject:nil
+            waitUntilDone:NO
+                    modes:[self.runLoopModes allObjects]];
 }
 
 - (void)startCleanData {
     NSRunLoop *runloop = [NSRunLoop currentRunLoop];
-    _cleaningTimer = [NSTimer timerWithTimeInterval:10.f target:self selector:@selector(doCleanData) userInfo:nil repeats:YES];
+    _cleaningTimer = [NSTimer timerWithTimeInterval:10.f
+                                             target:self
+                                           selector:@selector(doCleanData)
+                                           userInfo:nil
+                                            repeats:YES];
     [runloop addTimer:_cleaningTimer forMode:NSDefaultRunLoopMode];
     while (YES) {
         [runloop runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:2.f]];

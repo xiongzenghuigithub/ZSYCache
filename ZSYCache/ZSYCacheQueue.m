@@ -84,6 +84,7 @@
         return;
     }
     
+    //处于最左边的越早超时
     for (int i = 0; i < (_keysQueue.count - 1); i++) {//count-1，是因为最后加入的时刚入队的，肯定不会超时
         NSString *cachedObjectKey = [_keysQueue objectAtIndex:i];
         ZSYCacheObject *cachedObject = [_holder zsyGetObjectForKey:cachedObjectKey];
