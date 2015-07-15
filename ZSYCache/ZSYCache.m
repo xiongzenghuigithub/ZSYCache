@@ -147,7 +147,7 @@ static NSString *const ZSYCACHE_DEFAULT_POOL_NAME       = @"ZSYDefaultCachePool"
 }
 
 - (NSInteger)memorySize {
-    return self.holder.size;
+    return self.holder.memorySize;
 }
 
 @end

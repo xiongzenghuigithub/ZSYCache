@@ -8,6 +8,7 @@
 
 #import "ViewController.h"
 #import "ZSYCacheHeader.h"
+#import "ZSYCacheTool.h"
 #import "Person.h"
 
 @interface ViewController ()
@@ -30,6 +31,7 @@
     [self.view addSubview:btn];
     
     [btn addTarget:self action:@selector(btnClick) forControlEvents:UIControlEventTouchUpInside];
+    
 }
 
 - (void)btnClick {

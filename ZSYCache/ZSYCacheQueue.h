@@ -13,14 +13,13 @@
 @interface ZSYCacheQueue : NSObject
 
 @property (nonatomic, strong) NSString *name;
-@property (nonatomic, assign) NSInteger size;
+@property (nonatomic, assign) NSInteger size;//队列长度
 @property (nonatomic, strong, readonly) NSMutableArray *keysQueue;
 
 @property (nonatomic, copy) void (^onPop)(id popedObject);
 @property (nonatomic, copy) void (^onExpirate)(id popedObject);
 
 - (instancetype)initWithHolder:(ZSYCacheHolder *)holder;
-- (instancetype)initWithName:(NSString *)name Size:(NSInteger)size;
 
 
 //key入队

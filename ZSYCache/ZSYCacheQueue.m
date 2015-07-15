@@ -52,7 +52,6 @@
     [self _cleanExpirateObjects];
     
     NSString *key = [NSString stringWithFormat:@"QUEUE_%@_%ld", self.name, self.offset];
-    [_holder zsySetObject:obj ForKey:key Duration:0];
     
     if (_keysQueue.count >= _size) {
         NSString *popKey = _keysQueue.firstObject;
@@ -60,9 +59,11 @@
         if (_onPop) {
             _onPop([cachedObject cacheObjectValue]);
         }
-        [_holder zsyRemoveObjectForKey:popKey];//本地移除
-        [_keysQueue removeObject:popKey];//内存key数组移除
+        [_holder zsyRemoveObjectForKey:popKey];//缓存移除
+        [_keysQueue removeObject:popKey];//key队列移除
     }
+    
+    [_holder zsySetObject:obj ForKey:key Duration:0];
     [_keysQueue addObject:key];
 }
 
@@ -72,8 +73,8 @@
     }
     NSString *firstKey = _keysQueue.firstObject;
     ZSYCacheObject *cacheObject = [_holder zsyGetObjectForKey:firstKey];
-    [_keysQueue removeObject:firstKey];
-    [_holder zsyRemoveObjectForKey:firstKey];
+    [_keysQueue removeObject:firstKey];//移除keysQueue队列保存的key
+    [_holder zsyRemoveObjectForKey:firstKey];//移除ZSYCacheObject.data与本地文件
     return [cacheObject cacheObjectValue];
 }
 
@@ -84,18 +85,18 @@
         return;
     }
     
-    //处于最左边的越早超时
-    for (int i = 0; i < (_keysQueue.count - 1); i++) {//count-1，是因为最后加入的时刚入队的，肯定不会超时
-        NSString *cachedObjectKey = [_keysQueue objectAtIndex:i];
-        ZSYCacheObject *cachedObject = [_holder zsyGetObjectForKey:cachedObjectKey];
-        if ([cachedObject isCacheObjectExpirate]) {
-            if (_onExpirate) {
-                _onExpirate([cachedObject cacheObjectValue]);
-            }
-            [_keysQueue removeObject:cachedObjectKey];
-            [_holder zsyRemoveObjectForKey:cachedObjectKey];
-        }
-    }
+//    //处于最左边的越早超时
+//    for (int i = 0; i < (_keysQueue.count - 1); i++) {//count-1，是因为最后加入的时刚入队的，肯定不会超时
+//        NSString *cachedObjectKey = [_keysQueue objectAtIndex:i];
+//        ZSYCacheObject *cachedObject = [_holder zsyGetObjectForKey:cachedObjectKey];
+//        if ([cachedObject isCacheObjectExpirate]) {
+//            if (_onExpirate) {
+//                _onExpirate([cachedObject cacheObjectValue]);
+//            }
+//            [_keysQueue removeObject:cachedObjectKey];
+//            [_holder zsyRemoveObjectForKey:cachedObjectKey];
+//        }
+//    }
 }
 
 - (void)_clearCompeltionBlocks {

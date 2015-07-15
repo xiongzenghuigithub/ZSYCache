@@ -10,6 +10,7 @@
 #import "ZSYCacheTool.h"
 #import "ZSYCacheHeader.h"
 #import "NSDictionary+ObjectiveSugar.h"
+#import "ZSYCacheQueue.h"
 
 //static NSInteger LOCK_CONDITION_FREE                 = 1;
 //static NSInteger LOCK_CONDITION_OPERATING            = 2;
@@ -17,7 +18,8 @@
 static NSString *const ZSYCACHE_DEFAULT_HOLDER_NAME = @"ZsyCaheDefaultHolder";
 static NSString *const ZSYCACHE_DEFAULT_HOLDER_FOLDER = @"ZsyCaheDefaultHolderFolder";
 
-static NSInteger const ZSYCACHE_DEFAULT_ARCHIVER_TIME   = 10.f;
+//static NSInteger const ZSYCACHE_DEFAULT_ARCHIVER_TIME   = 10.f;
+static NSInteger const ZSYCACHE_DEFAULT_ARCHIVER_TIME   = 5.f;
 static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
 
 /**
@@ -30,16 +32,18 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
     
 }
 
-@property (nonatomic, copy, readwrite) NSString *path;
-@property (nonatomic, assign, readwrite)  NSInteger size;
-@property (nonatomic, assign, readwrite)  BOOL isArchiving;
-@property (nonatomic, strong, readwrite)  NSMutableDictionary *objects;//存储ZSYCacheObject.cacheData
-@property (nonatomic, strong, readwrite)  NSMutableArray *keys;
-@property (nonatomic, strong) NSConditionLock *conditionLock;
-@property (nonatomic, strong) NSRecursiveLock *normalLock;
-@property (nonatomic, strong) NSTimer *archiveringTimer;
-@property (nonatomic, strong) NSTimer *cleaningTimer;
-@property (nonatomic, strong) NSSet *runLoopModes;
+@property (nonatomic, copy, readwrite)      NSString                *path;
+@property (nonatomic, assign, readwrite)    NSInteger               memorySize;//总得内存缓存大小
+@property (nonatomic, assign, readwrite)    BOOL                    isArchiving;
+@property (nonatomic, strong, readwrite)    NSMutableDictionary     *objects;//存储NSData
+@property (nonatomic, strong, readwrite)    NSMutableArray          *keys;
+@property (nonatomic, strong)               NSConditionLock         *conditionLock;
+@property (nonatomic, strong)               NSRecursiveLock         *normalLock;
+@property (nonatomic, strong)               NSTimer                 *archiveringTimer;
+@property (nonatomic, strong)               NSTimer                 *cleaningTimer;
+@property (nonatomic, strong)               NSSet                   *runLoopModes;
+
+
 
 //工具函数
 
@@ -78,7 +82,7 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
 - (instancetype)initWithIdentifier:(NSString *)identifier {
     self = [super init];
     if (self) {
-        _size = 0;
+        _memorySize = 0;
         _objects = [NSMutableDictionary dictionary];
         _keys = [NSMutableArray array];
         _isArchiving = NO;
@@ -112,13 +116,15 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
     } else {
         //如果处于 _isArchiving = YES时，会对objects保存的对象进行清理，会出现数据不同步
         [self.objects setValue:cacheObject.cacheObjectData forKey:key];
-        self.size += cacheObject.cacheObjectDataSize;
+        self.memorySize += cacheObject.cacheObjectDataSize;
     }
     
     //按照过期时间从小--》到大，重新排序keys数组
-    //数组下标0++， 过期时间越来越晚
-    [_normalLock lock];
+    
+    //如果存在当前要插入的key，先删除掉，后续找到正确的位置再插入
     [self.keys removeObject:key];
+    
+    [_normalLock lock];
     for (NSInteger i = (_keys.count - 1);i >= 0; i--) {
         NSString *lastKey = [_keys objectAtIndex:i];
         ZSYCacheObject *tmp = [self zsyGetObjectForKey:lastKey];
@@ -131,18 +137,19 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
             break;
         }
     }
+    [_normalLock unlock];
     
     //说明当前object的过期时间最早，直接插入到数组0个位置
     if (![self.keys containsObject:key]) {
         [self.keys addObject:key];
     }
     
-    [_normalLock unlock];
+    NSLog(@"Keys: %@ , Size = %ld", self.keys, self.memorySize);
     
-    //如果内存保存的数据超过规定大小，持久化到本地
-    if ([self isShouldLoadToMemory]){
-        [self doArchiverData];//注： 多线程调用方法
-    }
+    //如果内存保存的数据超过规定大小，持久化到本地【注意： 没必要调用，后续定时会检查】
+//    if ([self isShouldLoadToMemory]){
+//        [self doArchiverData];
+//    }
 }
 
 - (ZSYCacheObject *)zsyGetObjectForKey:(NSString *)key {
@@ -162,7 +169,10 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
     NSParameterAssert(key);
     //内存删除
     [_keys removeObject:key];
+    
     if ([self.objects hasKey:key]) {
+        NSData *cacheData = self.objects[key];
+        self.memorySize -= cacheData.length;
         [self.objects removeObjectForKey:key];
     }
     //本地删除
@@ -253,17 +263,21 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
 
 #pragma mark 归档
 - (void)doArchiverData {
-    [_normalLock lock];
-    NSLog(@"...doArchiverData...\n");
+    
     _isArchiving = YES;
+    
+    NSLog(@"doArchiverData开始 Keys: %@ , Size = %ld", self.keys, self.memorySize);
+
     if (ZSYCACHE_ARCHIVING_THRESHOLD > 0 && \
-        self.size > ZSYCACHE_ARCHIVING_THRESHOLD)
+        self.memorySize > ZSYCACHE_ARCHIVING_THRESHOLD)
     {
         [ZSYCacheTool checkFolderAtPath:_path];
+        
+        [_normalLock lock];
         NSMutableArray *copyKeys = [self.keys mutableCopy];//使用深拷贝一个新的
         while([copyKeys count] > 0) {
             
-            if (self.size <= ZSYCACHE_ARCHIVING_THRESHOLD/2) {
+            if (self.memorySize <= ZSYCACHE_ARCHIVING_THRESHOLD/2) {
                 break;
             }
             
@@ -274,14 +288,19 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
             [cacheData writeToFile:localFilePath atomically:YES];
             
             //修正内存长度
-            self.size -= cacheData.length;
+            self.memorySize -= cacheData.length;
             [self.objects removeObjectForKey:key];
             [copyKeys removeLastObject];
         }
-        _keys = copyKeys;
+        _keys = [copyKeys mutableCopy];
+        copyKeys = nil;
+        [_normalLock unlock];
     }
+    
     _isArchiving = NO;
-    [_normalLock unlock];
+    
+    
+    NSLog(@"doArchiverData结束 Keys: %@ , Size = %ld", self.keys, self.memorySize);
 }
 
 - (void)doArchiverDatas {
@@ -311,7 +330,7 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
 
 #pragma mark 清除数据
 - (void)doCleanData {
-    NSLog(@"... doCleanData ... \n");
+
 }
 
 - (void)doCleanDatas {
@@ -325,39 +344,39 @@ static NSInteger const ZSYCACHE_DEFAULT_CLEANING_TIME   = 10.f;
 #pragma mark Find CachedObejct
 //内存或本地读取
 - (ZSYCacheObject *)cachedObjectForKey:(NSString *)key {
-    [_normalLock lock];
     if (![_keys containsObject:key]) {//1. 内存不存在key，读取文件data
         
         NSString *path = [self.path stringByAppendingPathComponent:key];
         if ([ZSYCacheTool checkFileAtPath:path]) {
             NSData *data = [[NSData alloc] initWithContentsOfFile:path];
-            if (![self isShouldLoadToMemory]) {
-                //读入内存
-                self.size += data.length;
+            
+            if (!data) {
+                return nil;
+            }
+            
+            //将NSData读入内存的条件
+            if (ZSYCACHE_DEFAULT_ARCHIVER_TIME > 0 && \
+                self.memorySize <= ZSYCACHE_DEFAULT_ARCHIVER_TIME && \
+                !_isArchiving)
+            {
+                //读入内存，同时修正内存总长度
+                self.memorySize += data.length;
                 [self.objects setValue:data forKey:key];
+                
                 //移除本地文件
                 [ZSYCacheTool removeFileAtPath:path];
-                [_normalLock unlock];
                 return [[ZSYCacheObject alloc] initWithData:data];
+                
             } else {
-                [_normalLock unlock];
                 return [[ZSYCacheObject alloc] initWithData:data];
             }
         } else {
             return nil;
         }
     } else {//2. 内存存在key，直接读取内存data
-        [_normalLock unlock];
         return [[ZSYCacheObject alloc] initWithData:self.objects[key]];
     }
 }
 
-#pragma mark Is Over Max Memory Size
-- (BOOL)isShouldLoadToMemory {
-    BOOL flag =  (ZSYCACHE_ARCHIVING_THRESHOLD > 0 && \
-                  self.size > ZSYCACHE_ARCHIVING_THRESHOLD && \
-                  !_isArchiving);
-    return flag;
-}
 
 @end

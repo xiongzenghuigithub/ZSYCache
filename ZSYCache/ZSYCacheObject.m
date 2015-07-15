@@ -70,7 +70,9 @@ NSString *const ZSYCACHE_DEFAULT_DATA_KEY = @"zsyCacheData";
         self.options = [ZSYCacheTool unArchiverNSDataToObejct:self.data];
     }
     NSInteger expirateTime = [self.options[ZSYCACHE_DEFAULT_EXPIRATE_TIMESTAMP_KEY] integerValue];
-    if (expirateTime < [ZSYCacheTool nowTimestamp]) {
+    NSInteger nowTime = [ZSYCacheTool nowTimestamp];
+    if (expirateTime < nowTime) {
+        NSLog(@"self.options = %@ , 已经超时\n", self.options);
         return YES;
     } else {
         return NO;

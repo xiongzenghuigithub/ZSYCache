@@ -9,13 +9,12 @@
 #import <Foundation/Foundation.h>
 #import "ZSYCacheObject.h"
 
-
-
 @interface ZSYCacheHolder : NSObject
 
-@property (nonatomic, assign, readonly)  NSInteger size;
+@property (nonatomic, assign, readonly)  NSInteger memorySize;
 @property (nonatomic, strong, readonly)  NSMutableDictionary *objects;
 @property (nonatomic, strong, readonly)  NSMutableArray *keys;
+
 
 - (instancetype)initWithIdentifier:(NSString *)identifier;
 

@@ -17,6 +17,6 @@
 
 // 把内存归档到磁盘的阈值，单位 byte
 //#define     ZSYCACHE_ARCHIVING_THRESHOLD    500000  //50M
-#define     ZSYCACHE_ARCHIVING_THRESHOLD    1000  //50M
+#define     ZSYCACHE_ARCHIVING_THRESHOLD    2000
 
 #endif

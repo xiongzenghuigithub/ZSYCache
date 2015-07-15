@@ -11,11 +11,13 @@
 @implementation ZSYCacheTool
 
 + (NSInteger)nowTimestamp {
-    return (NSInteger)ceil([[NSDate date] timeIntervalSince1970]);
+    NSInteger time = (NSInteger)ceil([[NSDate date] timeIntervalSince1970]);
+    return time;
 }
 
 + (NSInteger)expirateTimestampFromNowWithDuration:(NSInteger)duration {
-    return [self nowTimestamp] + duration;
+    NSInteger time = [self nowTimestamp] + duration;
+    return time;
 }
 
 + (NSData *)archiverObjectToNSData:(id)object {
